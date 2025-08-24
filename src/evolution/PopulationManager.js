@@ -45,7 +45,7 @@ export class PopulationManager {
     /**
      * Update all entities in the population
      */
-    update(world, tick) {
+    update(world, tick, database = null, sessionId = null) {
         const livingEntities = this.entities.filter(entity => entity.energy > 0);
         
         // Update each entity
@@ -55,8 +55,19 @@ export class PopulationManager {
             
             const survived = entity.update(world, livingEntities, tick);
             
+            // Database logging for entity metrics
+            if (database && sessionId && survived) {
+                database.recordEntityMetrics(sessionId, entity, tick, entity.lastAction);
+                
+                // Store recent memory if it exists
+                if (entity.memory && entity.memory.length > 0) {
+                    const recentMemory = entity.memory[entity.memory.length - 1];
+                    database.storeEntityMemory(sessionId, entity, tick, recentMemory);
+                }
+            }
+            
             if (!survived) {
-                this.handleEntityDeath(i);
+                this.handleEntityDeath(i, database, sessionId, tick);
             }
         }
     }
@@ -64,8 +75,13 @@ export class PopulationManager {
     /**
      * Handle entity death and create replacement
      */
-    handleEntityDeath(entityIndex) {
+    handleEntityDeath(entityIndex, database = null, sessionId = null, tick = 0) {
         const deadEntity = this.entities[entityIndex];
+        
+        // Database logging for death
+        if (database && sessionId) {
+            database.recordEntityDeath(sessionId, deadEntity, tick, 'energy_depletion');
+        }
         
         // Update statistics
         this.totalDeaths++;
@@ -87,6 +103,19 @@ export class PopulationManager {
         } else {
             // No living entities - create random
             newEntity = new ConsciousEntity(null, null, null, this.gridSize);
+        }
+        
+        // Database logging for birth
+        if (database && sessionId) {
+            database.recordEntityBirth(sessionId, newEntity, this.generation, tick, bestParent?.id);
+            
+            // Record mutation event
+            if (bestParent) {
+                database.recordEvolutionEvent(
+                    sessionId, tick, 'mutation', newEntity.id, bestParent.id, null,
+                    { mutationRate: this.mutationRate, mutationStrength: this.mutationStrength }
+                );
+            }
         }
         
         this.entities[entityIndex] = newEntity;

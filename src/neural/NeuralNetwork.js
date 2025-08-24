@@ -205,4 +205,123 @@ export class NeuralNetwork {
         
         return architecture;
     }
+    
+    /**
+     * Serialize network to a database-friendly format
+     * @returns {object} - Serializable network data
+     */
+    serialize() {
+        return {
+            layers: this.layers.map(layer => ({
+                weights: layer.weights,
+                biases: layer.biases
+            })),
+            architecture: this.getArchitecture(),
+            version: '1.0',
+            serializedAt: Date.now()
+        };
+    }
+    
+    /**
+     * Create network from serialized data
+     * @param {object} data - Serialized network data
+     * @returns {NeuralNetwork} - Reconstructed network
+     */
+    static deserialize(data) {
+        if (!data.layers || !data.architecture) {
+            throw new Error('Invalid serialized network data');
+        }
+        
+        // Extract architecture info
+        const structure = data.architecture.structure;
+        const inputSize = structure[0].inputs;
+        const hiddenSizes = structure.slice(0, -1).map(layer => layer.neurons);
+        const outputSize = structure[structure.length - 1].neurons;
+        
+        // Create network with correct architecture
+        const network = new NeuralNetwork(inputSize, hiddenSizes, outputSize);
+        
+        // Replace with serialized weights and biases
+        data.layers.forEach((layerData, index) => {
+            if (index < network.layers.length) {
+                network.layers[index].weights = layerData.weights.map(row => [...row]);
+                network.layers[index].biases = [...layerData.biases];
+            }
+        });
+        
+        return network;
+    }
+    
+    /**
+     * Calculate network similarity to another network
+     * @param {NeuralNetwork} other - Network to compare with
+     * @returns {number} - Similarity score (0-1, 1 = identical)
+     */
+    calculateSimilarity(other) {
+        if (this.layers.length !== other.layers.length) {
+            return 0;
+        }
+        
+        let totalDifference = 0;
+        let totalParameters = 0;
+        
+        for (let i = 0; i < this.layers.length; i++) {
+            const thisLayer = this.layers[i];
+            const otherLayer = other.layers[i];
+            
+            // Compare weights
+            for (let j = 0; j < thisLayer.weights.length; j++) {
+                for (let k = 0; k < thisLayer.weights[j].length; k++) {
+                    totalDifference += Math.abs(thisLayer.weights[j][k] - otherLayer.weights[j][k]);
+                    totalParameters++;
+                }
+            }
+            
+            // Compare biases
+            for (let j = 0; j < thisLayer.biases.length; j++) {
+                totalDifference += Math.abs(thisLayer.biases[j] - otherLayer.biases[j]);
+                totalParameters++;
+            }
+        }
+        
+        const averageDifference = totalDifference / totalParameters;
+        return Math.max(0, 1 - averageDifference);
+    }
+    
+    /**
+     * Get weight statistics for analysis
+     * @returns {object} - Weight distribution statistics
+     */
+    getWeightStats() {
+        let allWeights = [];
+        let allBiases = [];
+        
+        for (const layer of this.layers) {
+            for (const row of layer.weights) {
+                allWeights.push(...row);
+            }
+            allBiases.push(...layer.biases);
+        }
+        
+        const calculateStats = (values) => {
+            const sorted = values.sort((a, b) => a - b);
+            const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+            const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+            
+            return {
+                count: values.length,
+                min: sorted[0],
+                max: sorted[sorted.length - 1],
+                mean: mean,
+                std: Math.sqrt(variance),
+                median: sorted[Math.floor(sorted.length / 2)]
+            };
+        };
+        
+        return {
+            weights: calculateStats(allWeights),
+            biases: calculateStats(allBiases),
+            totalParameters: allWeights.length + allBiases.length
+        };
+    }
 }

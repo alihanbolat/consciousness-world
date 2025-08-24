@@ -82,18 +82,33 @@
                 </div>
             </div>
 
-            <!-- Data Export -->
+            <!-- Database & Analysis -->
             <div class="control-section">
-                <h3>Data & Analysis</h3>
+                <h3>Database & Analysis</h3>
+                <div class="database-status" id="databaseStatus">
+                    <div>🗄️ Database: <span id="dbStatusText">Checking...</span></div>
+                    <div id="dbSessionInfo"></div>
+                </div>
                 <div class="button-group">
                     <button id="exportData">Export Data</button>
+                    <button id="viewDatabase" onclick="openDatabaseAnalysis()">View Database</button>
                     <button onclick="window.simulation?.saveState()">Save State</button>
                     <button onclick="window.simulation?.loadState()">Load State</button>
                 </div>
-                <label>
-                    <input type="checkbox" id="dataRecording" onchange="window.simulation?.setDataRecording(this.checked)">
-                    Enable Data Recording
-                </label>
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="dataRecording" onchange="window.simulation?.setDataRecording(this.checked)">
+                        Enable Data Recording
+                    </label>
+                    <label>
+                        <input type="checkbox" id="enableDatabase" checked onchange="toggleDatabase(this.checked)">
+                        Enable Database Logging
+                    </label>
+                </div>
+                <div class="database-stats" id="databaseStats" style="display: none;">
+                    <h4>Database Statistics</h4>
+                    <div id="dbStatsContent">Loading...</div>
+                </div>
             </div>
 
             <!-- Legend -->

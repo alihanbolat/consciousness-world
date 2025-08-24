@@ -13,6 +13,7 @@ import { WorldPhysics } from '../physics/WorldPhysics.js';
 import { PopulationManager } from '../evolution/PopulationManager.js';
 import { WorldRenderer } from '../visualization/WorldRenderer.js';
 import { UIController } from '../visualization/UIController.js';
+import { DatabaseManager } from '../utils/DatabaseManager.js';
 
 export class ConsciousnessSimulation {
     constructor(canvasId, options = {}) {
@@ -24,6 +25,8 @@ export class ConsciousnessSimulation {
             tickRate: options.tickRate || 5, // ticks per second
             autoSave: options.autoSave || false,
             debug: options.debug || false,
+            enableDatabase: options.enableDatabase !== false, // Default to enabled
+            databasePath: options.databasePath || 'data/consciousness-evolution.db',
             ...options
         };
         
@@ -32,6 +35,19 @@ export class ConsciousnessSimulation {
         this.population = new PopulationManager(this.config.populationSize, this.config.gridSize);
         this.renderer = new WorldRenderer(canvasId, this.config.gridSize, this.config.cellSize);
         this.ui = new UIController();
+        
+        // Database system (optional)
+        this.database = null;
+        this.currentSessionId = null;
+        if (this.config.enableDatabase) {
+            try {
+                this.database = new DatabaseManager(this.config.databasePath);
+                console.log('🗄️ Database system initialized');
+            } catch (error) {
+                console.warn('⚠️ Database initialization failed, continuing without database:', error.message);
+                this.config.enableDatabase = false;
+            }
+        }
         
         // Simulation state
         this.isRunning = false;
@@ -161,6 +177,13 @@ export class ConsciousnessSimulation {
         this.paused = false;
         this.lastTick = Date.now();
         
+        // Start new database session
+        if (this.database && !this.currentSessionId) {
+            const sessionName = `Simulation ${new Date().toISOString()}`;
+            const sessionDescription = `Consciousness simulation with ${this.config.populationSize} entities`;
+            this.currentSessionId = this.database.startSession(sessionName, sessionDescription, this.config);
+        }
+        
         this.animationId = setInterval(() => {
             this.step();
         }, this.tickInterval);
@@ -185,6 +208,17 @@ export class ConsciousnessSimulation {
             this.animationId = null;
         }
         
+        // End database session
+        if (this.database && this.currentSessionId) {
+            const stats = this.population.getPopulationStats();
+            this.database.endSession(
+                this.currentSessionId,
+                this.sessionStats.totalTicks,
+                stats.totalDeaths + this.config.populationSize,
+                stats.bestAllTimeFitness
+            );
+        }
+        
         this.ui.updateControlStates(false);
         
         if (this.config.debug) {
@@ -201,12 +235,27 @@ export class ConsciousnessSimulation {
         // Step world physics
         this.world.step();
         
-        // Update population
-        this.population.update(this.world, this.world.tick);
+        // Update population with database logging
+        this.population.update(this.world, this.world.tick, this.database, this.currentSessionId);
         
         // Record generation statistics periodically
         if (this.world.tick % 10 === 0) {
             this.population.recordGenerationStats(this.world.tick);
+        }
+        
+        // Database logging
+        if (this.database && this.currentSessionId) {
+            // Record population stats every tick
+            const stats = this.population.getPopulationStats();
+            const worldState = this.world.getWorldState();
+            this.database.recordPopulationStats(this.currentSessionId, this.world.tick, stats, worldState);
+            
+            // Record neural networks periodically (every 5 ticks to avoid excessive data)
+            if (this.world.tick % 5 === 0) {
+                this.population.getLivingEntities().forEach(entity => {
+                    this.database.storeNeuralNetwork(this.currentSessionId, entity, this.world.tick, stats.generation);
+                });
+            }
         }
         
         // Update session statistics
