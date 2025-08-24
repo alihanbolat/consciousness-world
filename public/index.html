@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consciousness World - Artificial Life Simulation</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="header">
+        <h1>Consciousness World</h1>
+        <p>Artificial consciousness simulation with neural networks, evolution, and emergent behavior</p>
+    </div>
+
+    <div class="container">
+        <div class="world-container">
+            <canvas id="worldCanvas" width="500" height="500"></canvas>
+            <div class="canvas-overlay">
+                <div class="phase-indicator" id="phaseIndicator">EMIT PHASE</div>
+            </div>
+        </div>
+        
+        <div class="controls-panel">
+            <!-- Simulation Controls -->
+            <div class="control-section">
+                <h3>Simulation Controls</h3>
+                <div class="button-group">
+                    <button id="toggleBtn" class="primary-btn">Start Simulation</button>
+                    <button id="stepBtn" onclick="window.simulation?.step()">Single Step</button>
+                    <button id="resetBtn" onclick="window.simulation?.reset()">Reset World</button>
+                </div>
+                <div class="speed-control">
+                    <label>Speed: 
+                        <input type="range" id="speedSlider" min="1" max="20" value="5">
+                        <span id="speedValue">5</span> ticks/sec
+                    </label>
+                </div>
+            </div>
+
+            <!-- World Status -->
+            <div class="control-section">
+                <h3>World Status</h3>
+                <div class="stats-grid" id="worldStats">
+                    <div>Tick: 0</div>
+                    <div>Generation: 0</div>
+                    <div>Population: 5/5</div>
+                    <div>Deaths: 0</div>
+                    <div>Best Fitness: 0</div>
+                </div>
+            </div>
+
+            <!-- Entity Controls -->
+            <div class="control-section">
+                <h3>Entity Observer</h3>
+                <select id="entitySelector">
+                    <option value="-1">Select Entity</option>
+                </select>
+                <div class="entity-details" id="cellVision">
+                    <div>Select an entity to view details...</div>
+                </div>
+            </div>
+
+            <!-- Evolution Tracking -->
+            <div class="control-section">
+                <h3>Evolution Tracking</h3>
+                <div id="evolutionChart">
+                    <div>Evolution data will appear here...</div>
+                </div>
+                <button onclick="window.simulation?.population.forceEvolution()">Force Evolution</button>
+            </div>
+
+            <!-- Visualization Options -->
+            <div class="control-section">
+                <h3>Visualization</h3>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" class="vis-control" id="showTemperature" checked> Temperature</label>
+                    <label><input type="checkbox" class="vis-control" id="showCatalyser" checked> Catalyser</label>
+                    <label><input type="checkbox" class="vis-control" id="showCores" checked> Cores</label>
+                    <label><input type="checkbox" class="vis-control" id="showEnergies" checked> Energy</label>
+                    <label><input type="checkbox" class="vis-control" id="showEntities" checked> Entities</label>
+                    <label><input type="checkbox" class="vis-control" id="showEntityPaths"> Entity Paths</label>
+                </div>
+            </div>
+
+            <!-- Data Export -->
+            <div class="control-section">
+                <h3>Data & Analysis</h3>
+                <div class="button-group">
+                    <button id="exportData">Export Data</button>
+                    <button onclick="window.simulation?.saveState()">Save State</button>
+                    <button onclick="window.simulation?.loadState()">Load State</button>
+                </div>
+                <label>
+                    <input type="checkbox" id="dataRecording" onchange="window.simulation?.setDataRecording(this.checked)">
+                    Enable Data Recording
+                </label>
+            </div>
+
+            <!-- Legend -->
+            <div class="control-section">
+                <h3>Legend</h3>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="color-box" style="background: #ff0000;"></div>
+                        <span>Conscious Entity</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="color-box" style="background: #444;"></div>
+                        <span>Core (dormant)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="color-box" style="background: #666;"></div>
+                        <span>Core (incubated)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="color-box" style="background: #00ff00;"></div>
+                        <span>Energy (bloomed)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="color-box" style="background: rgba(0,100,255,0.5);"></div>
+                        <span>Catalyser Field</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="color-box" style="background: rgba(255,100,0,0.3);"></div>
+                        <span>Temperature Field</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Keyboard Shortcuts -->
+            <div class="control-section">
+                <h3>Keyboard Shortcuts</h3>
+                <div class="shortcuts">
+                    <div><kbd>Space</kbd> - Single step (when paused)</div>
+                    <div><kbd>R</kbd> - Reset simulation</div>
+                    <div><kbd>Click</kbd> - Select entity</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading indicator -->
+    <div id="loading" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div>Initializing Consciousness World...</div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="main.js"></script>
+</body>
+</html>
