@@ -1,0 +1,17 @@
+{
+  "name": "consciousness-world",
+  "version": "1.0.0",
+  "description": "A sophisticated artificial consciousness simulation featuring neural networks, evolution, and emergent behavior. This project explores artificial life through conscious entities that perceive their environment through raw sensory fields, learn through experience, and evolve over generations.",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
