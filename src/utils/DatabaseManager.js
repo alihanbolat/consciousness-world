@@ -10,9 +10,9 @@
  * - Fitness landscape analysis
  */
 
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+//import Database from 'better-sqlite3';
+//import path from 'path';
+//import fs from 'fs';
 
 export class DatabaseManager {
     constructor(dbPath = 'data/consciousness-evolution.db') {
