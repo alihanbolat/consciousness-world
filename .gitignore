@@ -102,6 +102,9 @@ logs
 exports/
 data/
 *.json
+# Allow package manifests
+!package.json
+!package-lock.json
 
 # Temporary files
 tmp/
