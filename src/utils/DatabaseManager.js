@@ -10,9 +10,9 @@
  * - Fitness landscape analysis
  */
 
-//import Database from 'better-sqlite3';
-//import path from 'path';
-//import fs from 'fs';
+import Database from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
 
 export class DatabaseManager {
     constructor(dbPath = 'data/consciousness-evolution.db') {
@@ -251,29 +251,52 @@ export class DatabaseManager {
     }
     
     /**
+     * Register initial population entities
+     */
+    registerInitialPopulation(sessionId, entities, generation = 0, tick = 0) {
+        entities.forEach(entity => {
+            try {
+                this.recordEntityBirth(sessionId, entity, generation, tick, null);
+            } catch (error) {
+                console.warn(`Failed to register initial entity ${entity.id}:`, error.message);
+            }
+        });
+        
+        console.log(`📊 Registered ${entities.length} initial entities for session ${sessionId}`);
+    }
+    
+    /**
      * Record entity birth
      */
     recordEntityBirth(sessionId, entity, generation, tick, parentId = null) {
-        const stmt = this.db.prepare(`
-            INSERT INTO entities (
-                id, session_id, generation, birth_tick, parent_id, 
-                birth_x, birth_y, max_energy
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        
-        stmt.run(
-            entity.id,
-            sessionId,
-            generation,
-            tick,
-            parentId,
-            entity.x,
-            entity.y,
-            entity.energy
-        );
-        
-        // Record birth event
-        this.recordEvolutionEvent(sessionId, tick, 'birth', entity.id, parentId);
+        try {
+            const stmt = this.db.prepare(`
+                INSERT INTO entities (
+                    id, session_id, generation, birth_tick, parent_id, 
+                    birth_x, birth_y, max_energy
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+            
+            stmt.run(
+                entity.id,
+                sessionId,
+                generation,
+                tick,
+                parentId,
+                entity.x || 0,
+                entity.y || 0,
+                entity.energy || 100
+            );
+            
+            // Record birth event
+            this.recordEvolutionEvent(sessionId, tick, 'birth', entity.id, parentId);
+        } catch (error) {
+            if (error.code === 'SQLITE_CONSTRAINT_PRIMARYKEY') {
+                console.debug(`Entity ${entity.id} already exists, skipping birth record`);
+            } else {
+                throw error; // Re-throw other errors
+            }
+        }
     }
     
     /**
@@ -312,32 +335,71 @@ export class DatabaseManager {
      * Store neural network snapshot
      */
     storeNeuralNetwork(sessionId, entity, tick, generation) {
-        const networkData = this.serializeNeuralNetwork(entity.brain);
-        const architecture = entity.brain.getArchitecture();
-        const architectureHash = this.hashString(JSON.stringify(architecture.structure));
-        
-        const stmt = this.db.prepare(`
-            INSERT INTO neural_networks (
-                entity_id, session_id, tick, generation,
-                network_data, architecture_hash, total_parameters
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-        
-        stmt.run(
-            entity.id,
-            sessionId,
-            tick,
-            generation,
-            networkData,
-            architectureHash,
-            architecture.totalParameters
-        );
+        try {
+            // Check if entity has a proper brain object
+            if (!entity.brain || !entity.brain.layers || !Array.isArray(entity.brain.layers)) {
+                console.warn(`Entity ${entity.id} has no valid brain structure - skipping neural network storage`);
+                return;
+            }
+
+            // Check if getArchitecture method exists
+            if (typeof entity.brain.getArchitecture !== 'function') {
+                console.warn(`Entity ${entity.id} brain missing getArchitecture method - skipping neural network storage`);
+                return;
+            }
+
+            const networkData = this.serializeNeuralNetwork(entity.brain);
+            const architecture = entity.brain.getArchitecture();
+            const architectureHash = this.hashString(JSON.stringify(architecture.structure));
+            
+            const stmt = this.db.prepare(`
+                INSERT INTO neural_networks (
+                    entity_id, session_id, tick, generation,
+                    network_data, architecture_hash, total_parameters
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            `);
+            
+            stmt.run(
+                entity.id,
+                sessionId,
+                tick,
+                generation,
+                networkData,
+                architectureHash,
+                architecture.totalParameters
+            );
+        } catch (error) {
+            console.warn(`Failed to store neural network for entity ${entity.id}:`, error.message);
+        }
     }
     
     /**
      * Record entity metrics for a tick
      */
     recordEntityMetrics(sessionId, entity, tick, action, reward = null) {
+        // Ensure entity exists - use INSERT OR IGNORE for race condition safety
+        try {
+            const insertStmt = this.db.prepare(`
+                INSERT OR IGNORE INTO entities (
+                    id, session_id, generation, birth_tick, parent_id, 
+                    birth_x, birth_y, max_energy
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+            
+            insertStmt.run(
+                entity.id,
+                sessionId,
+                0, // Default generation for auto-registered entities
+                tick,
+                null, // No parent for auto-registered entities
+                entity.x || 0,
+                entity.y || 0,
+                entity.energy || 100
+            );
+        } catch (error) {
+            console.warn(`Failed to auto-register entity ${entity.id}:`, error.message);
+        }
+        
         // Calculate vision averages
         let visionConfidenceSum = 0;
         let field1Sum = 0, field2Sum = 0, field3Sum = 0, field4Sum = 0, field5Sum = 0;
@@ -369,24 +431,28 @@ export class DatabaseManager {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         
-        stmt.run(
-            entity.id,
-            sessionId,
-            tick,
-            entity.x,
-            entity.y,
-            entity.energy,
-            entity.age,
-            action,
-            reward,
-            entity.memory ? entity.memory.length : 0,
-            visionConfidenceSum,
-            field1Sum,
-            field2Sum,
-            field3Sum,
-            field4Sum,
-            field5Sum
-        );
+        try {
+            stmt.run(
+                entity.id,
+                sessionId,
+                tick,
+                entity.x || 0,
+                entity.y || 0,
+                entity.energy || 0,
+                entity.age || 0,
+                action,
+                reward,
+                entity.memory ? entity.memory.length : 0,
+                visionConfidenceSum,
+                field1Sum,
+                field2Sum,
+                field3Sum,
+                field4Sum,
+                field5Sum
+            );
+        } catch (error) {
+            console.warn(`Failed to record metrics for entity ${entity.id}:`, error.message);
+        }
     }
     
     /**
@@ -478,13 +544,21 @@ export class DatabaseManager {
     }
     
     /**
-     * Serialize neural network to JSON
+     * Serialize neural network to JSON with compression
      */
     serializeNeuralNetwork(network) {
+        // Reduce precision to save space (6 decimal places instead of full precision)
+        const compressWeights = (arr) => {
+            if (Array.isArray(arr[0])) {
+                return arr.map(row => row.map(val => Math.round(val * 1000000) / 1000000));
+            }
+            return arr.map(val => Math.round(val * 1000000) / 1000000);
+        };
+        
         const networkData = {
             layers: network.layers.map(layer => ({
-                weights: layer.weights,
-                biases: layer.biases
+                weights: compressWeights(layer.weights),
+                biases: compressWeights(layer.biases)
             })),
             architecture: network.getArchitecture(),
             serializedAt: Date.now()

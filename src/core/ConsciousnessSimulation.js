@@ -13,7 +13,7 @@ import { WorldPhysics } from '../physics/WorldPhysics.js';
 import { PopulationManager } from '../evolution/PopulationManager.js';
 import { WorldRenderer } from '../visualization/WorldRenderer.js';
 import { UIController } from '../visualization/UIController.js';
-import { DatabaseManager } from '../utils/DatabaseManager.js';
+import { DatabaseAPI } from '../utils/DatabaseAPI.js';
 
 export class ConsciousnessSimulation {
     constructor(canvasId, options = {}) {
@@ -36,18 +36,18 @@ export class ConsciousnessSimulation {
         this.renderer = new WorldRenderer(canvasId, this.config.gridSize, this.config.cellSize);
         this.ui = new UIController();
         
-        // Database system (optional)
-        this.database = null;
+        // Database system (API client for browser)
+        this.dbAPI = new DatabaseAPI();
         this.currentSessionId = null;
-        if (this.config.enableDatabase) {
-            try {
-                this.database = new DatabaseManager(this.config.databasePath);
-                console.log('🗄️ Database system initialized');
-            } catch (error) {
-                console.warn('⚠️ Database initialization failed, continuing without database:', error.message);
-                this.config.enableDatabase = false;
+        
+        // Check database connectivity
+        this.dbAPI.checkStatus().then(status => {
+            if (status.database === 'connected') {
+                console.log('🗄️ Database API connected');
+            } else {
+                console.warn('⚠️ Database API not available:', status.error || 'Unknown error');
             }
-        }
+        });
         
         // Simulation state
         this.isRunning = false;
@@ -178,10 +178,19 @@ export class ConsciousnessSimulation {
         this.lastTick = Date.now();
         
         // Start new database session
-        if (this.database && !this.currentSessionId) {
+        if (!this.currentSessionId) {
             const sessionName = `Simulation ${new Date().toISOString()}`;
             const sessionDescription = `Consciousness simulation with ${this.config.populationSize} entities`;
-            this.currentSessionId = this.database.startSession(sessionName, sessionDescription, this.config);
+            this.dbAPI.startSession(sessionName, sessionDescription, this.config).then(sessionId => {
+                if (sessionId) {
+                    this.currentSessionId = sessionId;
+                    console.log('📊 Database session started:', sessionId);
+                    
+                    // Register initial population
+                    const initialEntities = this.population.getLivingEntities();
+                    this.dbAPI.registerInitialPopulation(initialEntities, 0, 0);
+                }
+            });
         }
         
         this.animationId = setInterval(() => {
@@ -209,14 +218,14 @@ export class ConsciousnessSimulation {
         }
         
         // End database session
-        if (this.database && this.currentSessionId) {
+        if (this.currentSessionId) {
             const stats = this.population.getPopulationStats();
-            this.database.endSession(
-                this.currentSessionId,
+            this.dbAPI.endSession(
                 this.sessionStats.totalTicks,
                 stats.totalDeaths + this.config.populationSize,
                 stats.bestAllTimeFitness
             );
+            this.currentSessionId = null;
         }
         
         this.ui.updateControlStates(false);
@@ -235,26 +244,30 @@ export class ConsciousnessSimulation {
         // Step world physics
         this.world.step();
         
-        // Update population with database logging
-        this.population.update(this.world, this.world.tick, this.database, this.currentSessionId);
+        // Update population with database API
+        this.population.update(this.world, this.world.tick, this.dbAPI, this.currentSessionId);
         
         // Record generation statistics periodically
         if (this.world.tick % 10 === 0) {
             this.population.recordGenerationStats(this.world.tick);
         }
         
-        // Database logging
-        if (this.database && this.currentSessionId) {
+        // Database logging through API
+        if (this.currentSessionId) {
             // Record population stats every tick
             const stats = this.population.getPopulationStats();
             const worldState = this.world.getWorldState();
-            this.database.recordPopulationStats(this.currentSessionId, this.world.tick, stats, worldState);
+            this.dbAPI.recordPopulationStats(this.world.tick, stats, worldState);
             
-            // Record neural networks periodically (every 5 ticks to avoid excessive data)
-            if (this.world.tick % 5 === 0) {
-                this.population.getLivingEntities().forEach(entity => {
-                    this.database.storeNeuralNetwork(this.currentSessionId, entity, this.world.tick, stats.generation);
-                });
+            // Neural network storage is disabled by default in DatabaseAPI
+            // Can be re-enabled later once entity serialization is properly handled
+            if (this.world.tick % 100 === 0) {
+                // Only store one random entity's network very rarely
+                const livingEntities = this.population.getLivingEntities();
+                if (livingEntities.length > 0) {
+                    const randomEntity = livingEntities[Math.floor(Math.random() * livingEntities.length)];
+                    this.dbAPI.storeNeuralNetwork(randomEntity, this.world.tick, stats.generation);
+                }
             }
         }
         

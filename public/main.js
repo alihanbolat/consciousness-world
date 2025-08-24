@@ -311,7 +311,7 @@ function updateDatabaseStatus() {
     const statusText = document.getElementById('dbStatusText');
     const sessionInfo = document.getElementById('dbSessionInfo');
     
-    if (simulation && simulation.database) {
+    if (simulation && simulation.dbAPI && simulation.dbAPI.isEnabled) {
         statusText.textContent = '✅ Connected';
         statusText.style.color = '#4ade80';
         
@@ -331,20 +331,21 @@ function updateDatabaseStatus() {
  * Update database statistics
  */
 function updateDatabaseStats() {
-    if (!simulation || !simulation.database) return;
+    if (!simulation || !simulation.dbAPI || !simulation.dbAPI.isEnabled) return;
     
     try {
-        const stats = simulation.database.getDatabaseStats();
+        // For now, database stats are only available from the API status endpoint
+        // This could be enhanced to fetch stats periodically via API
         const statsContent = document.getElementById('dbStatsContent');
         
         if (statsContent) {
             statsContent.innerHTML = `
-                <div>Sessions: ${stats.sessions}</div>
-                <div>Entities: ${stats.entities}</div>
-                <div>Neural Networks: ${stats.networks}</div>
-                <div>Metrics: ${stats.metrics}</div>
-                <div>Memories: ${stats.memories}</div>
-                <div>Evolution Events: ${stats.events}</div>
+                <div>Status: Connected via API</div>
+                <div>Session: ${simulation.currentSessionId ? 'Active' : 'None'}</div>
+                <div>Optimized payloads: ✅</div>
+                <div>Neural networks: ${simulation.dbAPI.enableNeuralNetworks ? 'Enabled' : 'Disabled'}</div>
+                <div>Batch size: ${simulation.dbAPI.batchSize}</div>
+                <div>Flush interval: ${simulation.dbAPI.flushInterval}ms</div>
             `;
         }
     } catch (error) {
@@ -362,8 +363,8 @@ function toggleDatabase(enabled) {
     // since that's initialized at startup. This is more for future enhancement
     // where database could be toggled at runtime.
     
-    if (enabled && !simulation.database) {
-        simulation.ui.showNotification('Database must be enabled at startup', 'warning');
+    if (enabled && !simulation.dbAPI.isEnabled) {
+        simulation.ui.showNotification('Database API not available', 'warning');
         document.getElementById('enableDatabase').checked = false;
         return;
     }
@@ -380,8 +381,8 @@ function toggleDatabase(enabled) {
  * Open database analysis window
  */
 function openDatabaseAnalysis() {
-    if (!simulation || !simulation.database) {
-        simulation.ui.showNotification('Database not available', 'warning');
+    if (!simulation || !simulation.dbAPI || !simulation.dbAPI.isEnabled) {
+        simulation.ui.showNotification('Database API not available', 'warning');
         return;
     }
     
@@ -583,13 +584,13 @@ async function generateDatabaseAnalysisHTML(popup) {
  * Export database data
  */
 function exportDatabaseData() {
-    if (!simulation || !simulation.database || !simulation.currentSessionId) {
+    if (!simulation || !simulation.dbAPI || !simulation.dbAPI.isEnabled || !simulation.currentSessionId) {
         simulation.ui.showNotification('No active database session to export', 'warning');
         return;
     }
     
     simulation.ui.showNotification('Database export initiated. Check console for progress.', 'info');
-    console.log('🗄️ Use "npm run db:export" for comprehensive database export');
+    console.log('🗄️ Use API endpoint for database export or "npm run db:export" for comprehensive database export');
 }
 
 // Export for use in other modules if needed
